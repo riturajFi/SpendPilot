@@ -17,10 +17,6 @@ class UpdatePolicyRequest(BaseModel):
     content: str = Field(min_length=1)
 
 
-class CreatePolicyResponse(BaseModel):
-    policy_id: int
-
-
 class PolicyResponse(BaseModel):
     id: int
     title: str

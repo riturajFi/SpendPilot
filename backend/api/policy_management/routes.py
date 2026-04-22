@@ -1,36 +1,50 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from backend.api.policy_management.schemas import (
     CreatePolicyRequest,
-    CreatePolicyResponse,
     PolicyResponse,
     UpdatePolicyRequest,
 )
 from backend.dependencies import get_db_session
-from backend.services.policy_management import PolicyManagementService
+from backend.repositories import PolicyRepository
+from backend.services.policy_indexing import PolicyIndexingService
 from backend.services.policy_management.commands import (
     CreatePolicyCommand,
     DeletePolicyCommand,
     UpdatePolicyCommand,
 )
+from backend.services.policy_management import PolicyCommandService, PolicyQueryService
 
 
 router = APIRouter(prefix="/policies", tags=["policy-management"])
 
 
-def get_policy_management_service(
+def get_policy_query_service(
     session: Session = Depends(get_db_session),
-) -> PolicyManagementService:
-    return PolicyManagementService(session)
+) -> PolicyQueryService:
+    return PolicyQueryService(PolicyRepository(session))
 
 
-@router.post("", response_model=CreatePolicyResponse, status_code=status.HTTP_201_CREATED)
+def get_policy_command_service(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> PolicyCommandService:
+    policy_repository = PolicyRepository(session)
+    policy_indexing_service: PolicyIndexingService = request.app.state.policy_indexing_service
+    return PolicyCommandService(
+        session=session,
+        policy_repository=policy_repository,
+        policy_indexing_service=policy_indexing_service,
+    )
+
+
+@router.post("", response_model=PolicyResponse, status_code=status.HTTP_201_CREATED)
 def create_policy(
     request: CreatePolicyRequest,
-    service: PolicyManagementService = Depends(get_policy_management_service),
-) -> CreatePolicyResponse:
-    return CreatePolicyResponse(
+    service: PolicyCommandService = Depends(get_policy_command_service),
+) -> PolicyResponse:
+    return PolicyResponse(
         **service.create_policy(CreatePolicyCommand(title=request.title, content=request.content))
     )
 
@@ -39,21 +53,22 @@ def create_policy(
 def update_policy(
     policy_id: int,
     request: UpdatePolicyRequest,
-    service: PolicyManagementService = Depends(get_policy_management_service),
+    service: PolicyCommandService = Depends(get_policy_command_service),
 ) -> PolicyResponse:
-    updated = service.update_policy(
-        UpdatePolicyCommand(
-            policy_id=policy_id,
-            title=request.title,
-            content=request.content,
+    return PolicyResponse(
+        **service.update_policy(
+            UpdatePolicyCommand(
+                policy_id=policy_id,
+                title=request.title,
+                content=request.content,
+            )
         )
     )
-    return PolicyResponse(**service.get_policy(updated["policy_id"]))
 
 
 @router.get("", response_model=list[PolicyResponse])
 def get_policies(
-    service: PolicyManagementService = Depends(get_policy_management_service),
+    service: PolicyQueryService = Depends(get_policy_query_service),
 ) -> list[PolicyResponse]:
     return [PolicyResponse(**item) for item in service.get_policies()]
 
@@ -61,14 +76,17 @@ def get_policies(
 @router.get("/{policy_id}", response_model=PolicyResponse)
 def get_policy(
     policy_id: int,
-    service: PolicyManagementService = Depends(get_policy_management_service),
+    service: PolicyQueryService = Depends(get_policy_query_service),
 ) -> PolicyResponse:
-    return PolicyResponse(**service.get_policy(policy_id))
+    policy = service.get_policy(policy_id)
+    if policy is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Policy not found")
+    return PolicyResponse(**policy)
 
 
 @router.delete("/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_policy(
     policy_id: int,
-    service: PolicyManagementService = Depends(get_policy_management_service),
+    service: PolicyCommandService = Depends(get_policy_command_service),
 ) -> None:
     service.delete_policy(DeletePolicyCommand(policy_id=policy_id))

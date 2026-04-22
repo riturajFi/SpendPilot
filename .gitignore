@@ -8,6 +8,10 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+.env
+.env.*
+backend/.env
+backend/.env.*
 
 # OS / editor
 .DS_Store

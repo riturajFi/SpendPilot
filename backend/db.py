@@ -1,8 +1,13 @@
 import os
+from importlib import import_module
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from backend.config import load_env
+
+
+load_env()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -17,3 +22,7 @@ class Base(DeclarativeBase):
 engine = create_engine(DATABASE_URL, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
+
+def initialize_database() -> None:
+    import_module("backend.models")
+    Base.metadata.create_all(bind=engine)
