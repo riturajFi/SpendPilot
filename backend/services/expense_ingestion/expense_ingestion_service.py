@@ -6,6 +6,10 @@ from sqlalchemy.orm import Session
 
 from backend.repositories import DocumentRepository, JobRepository
 from backend.services.expense_ingestion.storage import RawArtifactStore
+from backend.services.expense_pipeline_statuses import (
+    DOCUMENT_STATUS_UPLOADED,
+    JOB_STATUS_PENDING,
+)
 
 logger = getLogger(__name__)
 
@@ -24,18 +28,8 @@ class ExpenseIngestionService:
         self.job_repo = job_repo
 
     def ingest_file(self, file_bytes: bytes, file_name: str) -> dict:
-        if not file_name or not file_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file is required",
-            )
-
-        file_type = Path(file_name).suffix.lstrip(".").lower()
-        if not file_type:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Uploaded file must have an extension",
-            )
+        self._validate_uploaded_file(file_bytes=file_bytes, file_name=file_name)
+        file_type = self._get_file_type(file_name)
 
         try:
             logger.info("Expense ingestion start file_name=%s", file_name)
@@ -43,11 +37,11 @@ class ExpenseIngestionService:
             document = self.document_repo.create(
                 file_key=file_key,
                 file_type=file_type,
-                status="uploaded",
+                status=DOCUMENT_STATUS_UPLOADED,
             )
             job = self.job_repo.create(
                 document_id=document.id,
-                status="pending",
+                status=JOB_STATUS_PENDING,
             )
             self.session.commit()
             logger.info(
@@ -64,3 +58,19 @@ class ExpenseIngestionService:
             "document_id": document.id,
             "job_id": job.id,
         }
+
+    def _validate_uploaded_file(self, file_bytes: bytes, file_name: str) -> None:
+        if not file_name or not file_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file is required",
+            )
+
+    def _get_file_type(self, file_name: str) -> str:
+        file_type = Path(file_name).suffix.lstrip(".").lower()
+        if not file_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Uploaded file must have an extension",
+            )
+        return file_type

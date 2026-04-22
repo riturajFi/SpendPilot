@@ -6,6 +6,10 @@ from sqlalchemy.orm import Session
 from backend.repositories import DocumentRepository
 from backend.services.document_parsing.parsers import DocumentParserFactory
 from backend.services.expense_ingestion.storage import ParsedArtifactStore, RawArtifactStore
+from backend.services.expense_pipeline_statuses import (
+    DOCUMENT_STATUS_FAILED,
+    DOCUMENT_STATUS_PARSED,
+)
 
 logger = getLogger(__name__)
 
@@ -36,7 +40,7 @@ class DocumentParsingService:
             parser = self.parser_factory.get_parser(document.file_type)
             parsed_text = parser.parse(file_bytes)
             parsed_key = self.parsed_store.save_text(document_id, parsed_text)
-            self.document_repo.update_status(document_id, "parsed")
+            self.document_repo.update_status(document_id, DOCUMENT_STATUS_PARSED)
             self.session.commit()
             logger.info(
                 "Document parse success document_id=%s parsed_key=%s",
@@ -46,7 +50,14 @@ class DocumentParsingService:
             return {"document_id": document_id, "parsed_key": parsed_key}
         except Exception:
             self.session.rollback()
-            self.document_repo.update_status(document_id, "failed")
-            self.session.commit()
+            self._mark_document_failed(document_id)
             logger.exception("Document parse failed document_id=%s", document_id)
             raise
+
+    def _mark_document_failed(self, document_id: int) -> None:
+        try:
+            self.document_repo.update_status(document_id, DOCUMENT_STATUS_FAILED)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            logger.exception("Document parse failed status update document_id=%s", document_id)
