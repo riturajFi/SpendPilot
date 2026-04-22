@@ -1,0 +1,9 @@
+button - #E5F223
+text - #3D3D3D 
+text light - #A3A29F
+
+text mid - #3B424B
+
+bg - #DBDBDB
+
+font - roboto
