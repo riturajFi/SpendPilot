@@ -1,0 +1,5 @@
+Merchant: Cafe ABC
+Amount: 24.50
+Currency: USD
+Date: 2026-04-23
+Category: meal

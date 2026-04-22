@@ -41,3 +41,7 @@ class PolicyVectorStore(ABC):
     @abstractmethod
     def delete_policy_chunks(self, policy_id: int) -> None:
         raise NotImplementedError
+
+    @abstractmethod
+    def query_similar_chunks(self, embedding: list[float], top_k: int) -> list[Chunk]:
+        raise NotImplementedError

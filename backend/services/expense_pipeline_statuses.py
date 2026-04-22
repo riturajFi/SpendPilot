@@ -8,3 +8,6 @@ EXPENSE_STATUS_FLAGGED = "flagged"
 EXPENSE_STATUS_REJECTED = "rejected"
 
 JOB_STATUS_PENDING = "pending"
+JOB_STATUS_RUNNING = "running"
+JOB_STATUS_COMPLETED = "completed"
+JOB_STATUS_FAILED = "failed"

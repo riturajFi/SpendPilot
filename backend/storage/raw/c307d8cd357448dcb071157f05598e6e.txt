@@ -1,0 +1,5 @@
+Merchant: Wine Bar XYZ
+Amount: 85.00
+Currency: USD
+Date: 2026-04-23
+Category: alcohol
